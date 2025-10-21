@@ -338,7 +338,7 @@ class Gravity(pg.sprite.Sprite):
         super().__init__()
         self.image = pg.Surface((WIDTH, HEIGHT))
         pg.draw.rect(self.image, (0, 0, 0), (0, 0, WIDTH, HEIGHT))
-        self.image.set_alpha(255) # 透明度
+        self.image.set_alpha(100) # 透明度
         self.rect = self.image.get_rect()
         self.life = life
 
@@ -417,9 +417,9 @@ def main():
 
             ####追加####
             if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
-                if score.value > 20:
+                if score.value >= 200:
                     gravity.add(Gravity(400))
-                    score.value -= 20
+                    score.value -= 200
 
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_SPACE:
