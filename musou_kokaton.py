@@ -324,7 +324,7 @@ def main():
 
         for emy in emys:
             if emy.state == "stop" and tmr%emy.interval == 0 and not emy.emp_affected:
-                # 敌机が停止状態に入ったら，intervalに応じて爆弾投下（EMP影响済みの敵機は除く）
+                # 敵機が停止状態に入ったら，intervalに応じて爆弾投下（EMP影响済みの敵機は除く）
                 bombs.add(Bomb(emy, bird))
 
         # ビームと敵機の衝突判定
