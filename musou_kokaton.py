@@ -42,10 +42,10 @@ class Bird(pg.sprite.Sprite):
     ゲームキャラクター（こうかとん）に関するクラス
     """
     delta = {  # 押下キーと移動量の辞書
-        pg.K_UP: (0, -1),
-        pg.K_DOWN: (0, +1),
-        pg.K_LEFT: (-1, 0),
-        pg.K_RIGHT: (+1, 0),
+        pg.K_w: (0, -1),
+        pg.K_s: (0, +1),
+        pg.K_a: (-1, 0),
+        pg.K_d: (+1, 0),
     }
 
     def __init__(self, num: int, xy: tuple[int, int]):
@@ -278,6 +278,32 @@ class Score:
         screen.blit(self.image, self.rect)
 
 
+####追加####
+class Gravity(pg.sprite.Sprite):
+    """
+    画面全体を覆う重力場に関するクラス
+    """
+    def __init__(self, life: int):
+        """
+        重力場Surfaceを生成する
+        引数 life：発動時間
+        """
+        super().__init__()
+        self.image = pg.Surface((WIDTH, HEIGHT))
+        pg.draw.rect(self.image, (0, 0, 0), (0, 0, WIDTH, HEIGHT))
+        self.image.set_alpha(255) # 透明度
+        self.rect = self.image.get_rect()
+        self.life = life
+
+    def update(self):
+        """
+        発動時間を1減算し、0未満になったらkillする
+        """
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
+
+
 def main():
     pg.display.set_caption("真！こうかとん無双")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -289,6 +315,9 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+
+    ####追加####
+    gravity = pg.sprite.Group()
 
     tmr = 0
     clock = pg.time.Clock()
@@ -305,12 +334,19 @@ def main():
                         beams.add(b)
                 else:
                     beams.add(Beam(bird))
-            
-        # --- 無敵状態の発動 ---
+
+            ####追加####
+            if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
+                if score.value > 20:
+                    gravity.add(Gravity(400))
+                    score.value -= 20
+
+            # --- 無敵状態の発動 ---
         if key_lst[pg.K_RSHIFT] and bird.state == "normal" and score.value >= 100:
             bird.state = "hyper"
             bird.hyper_life = 500
             score.value -= 100  # スコア消費
+            beams.add(Beam(bird))
 
         screen.blit(bg_img, [0, 0])
 
@@ -343,16 +379,39 @@ def main():
                 time.sleep(2)
                 return
 
+        ####追加####  
+        for g in gravity:
+            for bomb in pg.sprite.spritecollide(g, bombs, True):
+                exps.add(Explosion(bomb, 50))
+                score.value += 1
+            for emy in pg.sprite.spritecollide(g, emys, True):
+                exps.add(Explosion(emy, 100))
+                score.value += 10
+
+        #bird.update(key_lst, screen)
+        beams.update()
+        beams.draw(screen)
+        emys.update()
+        emys.draw(screen)
+        bombs.update()
+        bombs.draw(screen)
+        #exps.update()
+        #exps.draw(screen)
+
+        ####追加####
+        gravity.update()
+        gravity.draw(screen)
+
+        ####場所変更####
+        exps.update()
+        exps.draw(screen)
         bird.update(key_lst, screen)
-        beams.update(); beams.draw(screen)
-        emys.update(); emys.draw(screen)
-        bombs.update(); bombs.draw(screen)
-        exps.update(); exps.draw(screen)
+
         score.update(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
-
+        
 
 if __name__ == "__main__":
     pg.init()
