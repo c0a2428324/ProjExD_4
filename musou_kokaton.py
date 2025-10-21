@@ -71,7 +71,7 @@ class Bird(pg.sprite.Sprite):
         self.image = self.imgs[self.dire]
         self.rect = self.image.get_rect()
         self.rect.center = xy
-        self.speed = 10
+        self.speed = 10  # 通常速度（参考用）
 
     def change_img(self, num: int, screen: pg.Surface):
         """
@@ -88,14 +88,19 @@ class Bird(pg.sprite.Sprite):
         引数1 key_lst：押下キーの真理値リスト
         引数2 screen：画面Surface
         """
+        # --- 追加機能1：高速化（左Shift押下中は速度20、通常は10） ---
+        speed = 20 if key_lst[pg.K_LSHIFT] else 10
+
         sum_mv = [0, 0]
         for k, mv in __class__.delta.items():
             if key_lst[k]:
                 sum_mv[0] += mv[0]
                 sum_mv[1] += mv[1]
-        self.rect.move_ip(self.speed*sum_mv[0], self.speed*sum_mv[1])
+
+        self.rect.move_ip(speed*sum_mv[0], speed*sum_mv[1])
         if check_bound(self.rect) != (True, True):
-            self.rect.move_ip(-self.speed*sum_mv[0], -self.speed*sum_mv[1])
+            self.rect.move_ip(-speed*sum_mv[0], -speed*sum_mv[1])
+
         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
             self.dire = tuple(sum_mv)
             self.image = self.imgs[self.dire]
@@ -122,7 +127,7 @@ class Bomb(pg.sprite.Sprite):
         self.image.set_colorkey((0, 0, 0))
         self.rect = self.image.get_rect()
         # 爆弾を投下するemyから見た攻撃対象のbirdの方向を計算
-        self.vx, self.vy = calc_orientation(emy.rect, bird.rect)  
+        self.vx, self.vy = calc_orientation(emy.rect, bird.rect)
         self.rect.centerx = emy.rect.centerx
         self.rect.centery = emy.rect.centery+emy.rect.height//2
         self.speed = 6
@@ -139,16 +144,17 @@ class Bomb(pg.sprite.Sprite):
 
 class Beam(pg.sprite.Sprite):
     """
-    ビームに関するクラス
+    ビームに関するクラス（弾幕対応：angle0で回転発射）
     """
-    def __init__(self, bird: Bird):
+    def __init__(self, bird: Bird, angle0: float = 0):
         """
-        ビーム画像Surfaceを生成する
-        引数 bird：ビームを放つこうかとん
+        引数 bird : ビームを放つこうかとん
+        引数 angle0 : 追加回転角度（度）。0なら従来どおり。
         """
         super().__init__()
         self.vx, self.vy = bird.dire
-        angle = math.degrees(math.atan2(-self.vy, self.vx))
+        base_angle = math.degrees(math.atan2(-self.vy, self.vx))
+        angle = base_angle + angle0
         self.image = pg.transform.rotozoom(pg.image.load(f"fig/beam.png"), angle, 1.0)
         self.vx = math.cos(math.radians(angle))
         self.vy = -math.sin(math.radians(angle))
@@ -165,6 +171,26 @@ class Beam(pg.sprite.Sprite):
         self.rect.move_ip(self.speed*self.vx, self.speed*self.vy)
         if check_bound(self.rect) != (True, True):
             self.kill()
+
+
+class NeoBeam:
+    """
+    弾幕（複数ビーム発射）クラス
+    """
+    def __init__(self, bird: Bird, num: int = 5):
+        self.bird = bird
+        self.num = num
+
+    def gen_beams(self) -> list:
+        """
+        -50°～+50°の範囲でnum本のビームを生成しリストで返す
+        0°を必ず含むように均等配置
+        """
+        if self.num == 1:
+            angles = [0.0]
+        else:
+            angles = [-50 + 100*i/(self.num-1) for i in range(self.num)]
+        return [Beam(self.bird, angle0=a) for a in angles]
 
 
 class Explosion(pg.sprite.Sprite):
@@ -200,7 +226,7 @@ class Enemy(pg.sprite.Sprite):
     敵機に関するクラス
     """
     imgs = [pg.image.load(f"fig/alien{i}.png") for i in range(1, 4)]
-    
+
     def __init__(self):
         super().__init__()
         self.image = pg.transform.rotozoom(random.choice(__class__.imgs), 0, 0.8)
@@ -261,15 +287,22 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
+            # --- Space：発射 / Shift+Space：弾幕発射 ---
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                beams.add(Beam(bird))
+                if key_lst[pg.K_LSHIFT]:
+                    neo = NeoBeam(bird, num=5)  # 本数は必要に応じて変更OK
+                    for b in neo.gen_beams():
+                        beams.add(b)
+                else:
+                    beams.add(Beam(bird))
+
         screen.blit(bg_img, [0, 0])
 
-        if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
+        if tmr % 200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
 
         for emy in emys:
-            if emy.state == "stop" and tmr%emy.interval == 0:
+            if emy.state == "stop" and tmr % emy.interval == 0:
                 # 敵機が停止状態に入ったら，intervalに応じて爆弾投下
                 bombs.add(Bomb(emy, bird))
 
