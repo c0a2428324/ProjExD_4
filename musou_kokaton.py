@@ -220,6 +220,7 @@ class Explosion(pg.sprite.Sprite):
         self.image = self.imgs[0]
         self.rect = self.image.get_rect(center=obj.rect.center)
         self.life = life
+        self.rect
 
     def update(self):
         """
@@ -348,6 +349,36 @@ class Gravity(pg.sprite.Sprite):
         self.life -= 1
         if self.life < 0:
             self.kill()
+        
+class Shield(pg.sprite.Sprite):
+    """
+    シールドに関するクラス
+    """
+    def __init__(self,bird: Bird,life: int):
+        """
+        シールドSurfaceを生成する
+        引数1 bird: こうかとん
+        引数2 life: 消滅時間
+        """
+        super().__init__()
+        self.life = life
+        self.image = pg.Surface((20, bird.rect.height * 2))
+        pg.draw.rect(self.image, (0, 0, 255), (0, 0, 20, bird.rect.height * 2))
+        vx, vy = bird.dire
+        angle = math.degrees(math.atan2(-vy, vx))
+        self.image = pg.transform.rotozoom(self.image, angle, 1.0)
+        self.rect = self.image.get_rect()
+        self.image.set_colorkey((0, 0, 0))
+        self.rect.centerx = bird.rect.centerx + bird.rect.width * vx
+        self.rect.centery = bird.rect.centery + bird.rect.height * vy
+
+    def update(self):
+        """
+        壁の消滅時間
+        """
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
 
 
 def main():
@@ -361,6 +392,7 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+    shield = pg.sprite.Group()
 
     ####追加####
     gravity = pg.sprite.Group()
@@ -396,10 +428,19 @@ def main():
                 if event.key == pg.K_e and score.value > 20:
                     emp.activate()
                     score.value -= 20  # スコアを消費する
+            
+            if event.type == pg.KEYDOWN and event.key == pg.K_r:
+                if score.value >= 50 and not shield:
+                    score.value -= 50
+                    shield.add(Shield(bird, 400))
         screen.blit(bg_img, [0, 0])
 
         if tmr % 200 == 0:  # 200フレームに1回，敵機を出現させる
             emys.add(Enemy())
+
+        for bomb in pg.sprite.groupcollide(bombs, shield, True, False).keys():
+            exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+            score.value += 1  # 1点アップ
 
         for emy in emys:
             if emy.state == "stop" and tmr % emy.interval == 0:
@@ -483,6 +524,8 @@ def main():
         # 更新EMP效果
         emp.update()
         
+        shield.update()
+        shield.draw(screen)
         score.update(screen)
         pg.display.update()
         tmr += 1
